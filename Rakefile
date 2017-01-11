@@ -97,93 +97,93 @@ task :default => :test
 
 # PACKAGING
 
+require 'bundler/setup'
+
 PACKAGE_NAME = "transrate"
 VERSION = `bundle exec bin/transrate -v`.chomp
-TRAVELING_RUBY_VERSION = "20150210-2.2.0"
+TRAVELING_RUBY_VERSION = "20150715"
+TARFILE = "rel-#{TRAVELING_RUBY_VERSION}.tar.gz"
+TRAVELING_RUBY_URL = "https://github.com/phusion/traveling-ruby/archive/rel-#{TRAVELING_RUBY_VERSION}.tar.gz"
+TRAVELING_RUBY_PACKAGE = File.join("packaging", "packaging", TARFILE)
 
-desc "Package your app"
-task :package => ['package:linux', 'package:osx']
+desc "Package transrate"
+task :package => ['package:linux']
 
 namespace :package do
-  desc "Package your app for Linux x86_64"
-  task :linux => [:bundle_install, "packaging/packaging/traveling-ruby-#{TRAVELING_RUBY_VERSION}-linux-x86_64.tar.gz"] do
-    create_package("linux-x86_64")
+
+  desc "Package transrate for linux x86_64"
+  task :linux => [:bundle_install, TRAVELING_RUBY_PACKAGE] do
+    create_package()
   end
 
-  desc "Package your app for OS X"
-  task :osx => [:bundle_install, "packaging/packaging/traveling-ruby-#{TRAVELING_RUBY_VERSION}-osx.tar.gz"] do
-    create_package("osx")
+  file TRAVELING_RUBY_PACKAGE do
+    download_runtime()
   end
-end
 
-file "packaging/packaging/traveling-ruby-#{TRAVELING_RUBY_VERSION}-linux-x86_64.tar.gz" do
-  download_runtime("linux-x86_64")
-end
-
-file "packaging/packaging/traveling-ruby-#{TRAVELING_RUBY_VERSION}-osx.tar.gz" do
-  download_runtime("osx")
-end
-
-desc "Install gems to local directory"
-task :bundle_install do
-  if RUBY_VERSION !~ /^2\.2\./
-    abort "You can only 'bundle install' using Ruby 2.2, because that's what Traveling Ruby uses."
+  desc "Install gems to local directory"
+  task :bundle_install do
+    if RUBY_VERSION !~ /^2\.2\./
+      msg "You can only 'bundle install' using Ruby 2.2, because that's"
+      msg << " what Traveling Ruby uses."
+      abort msg
+    end
+    Bundler.with_clean_env do
+      sh "env BUNDLE_IGNORE_CONFIG=1 bundle install --path packaging/vendor"
+    end
+    sh "rm -f packaging/vendor/*/*/cache/*"
   end
-  Bundler.with_clean_env do
-    sh "env BUNDLE_IGNORE_CONFIG=1 bundle install --path packaging/vendor --without development"
-  end
-  sh "rm -f packaging/vendor/*/*/cache/*"
+
 end
 
-def create_package(target)
-  package_pref = "#{PACKAGE_NAME}-#{VERSION}-#{target}"
-  package_dir = "packaging/#{package_pref}"
+def create_package
+  package_name = "#{PACKAGE_NAME}-#{VERSION}"
+  package_dir = File.join("packaging", package_name)
   sh "rm -rf #{package_dir}"
   sh "mkdir -p #{package_dir}/lib/app"
-  # copy transrate gem to destination
-  sh "cp -r lib bin deps ext files.txt #{package_dir}/lib/app/"
-  # install travelling ruby
-  sh "mkdir #{package_dir}/lib/app/ruby"
-  sh "tar -xzf packaging/packaging/traveling-ruby-#{TRAVELING_RUBY_VERSION}-#{target}.tar.gz -C #{package_dir}/lib/app/ruby"
-  # install loading script for transrate
+
+  # copy things from gem to package
+  sh "cp -r bin #{package_dir}/lib/" # bin
+  sh "cp -r lib #{package_dir}/lib/" # lib
+  sh "cp -r deps #{package_dir}/lib/" # deps
+  sh "cp files.txt #{package_dir}/lib/" # deps
+  sh "cp Gemfile* #{package_dir}/lib/" # Gemfiles
+  sh "cp *gemspec #{package_dir}/lib/" # gemspec
+
+  # download travelling ruby
+  sh "mkdir #{package_dir}/lib/ruby"
+  sh "tar -xzf packaging/packaging/#{TARFILE} -C #{package_dir}/lib/ruby"
   sh "cp packaging/transrate #{package_dir}/transrate"
-  # install bundled gem dependencies
-  sh "cp -pR packaging/vendor #{package_dir}/lib/"
-  sh "cd #{package_dir} && ../minify.sh"
-  sh "cp -r #{package_dir}/lib/vendor/* #{package_dir}/lib/app/"
-  sh "cp Gemfile Gemfile.lock transrate.gemspec #{package_dir}/lib/app/"
-  sh "mkdir #{package_dir}/lib/app/.bundle"
-  sh "cp packaging/bundler-config #{package_dir}/lib/app/.bundle/config"
-  # free up some more space in the package dir
-  sh "rm -rf #{package_dir}/lib/vendor"
-  sh "rm -rf #{package_dir}/lib/app/ruby/*/gems/*/test"
+  sh "cp -pR packaging/vendor/* #{package_dir}/lib/"
+  sh "cp Gemfile Gemfile.lock #{package_dir}/lib/"
+
   # install binary dependencies
-  bindest = File.expand_path "packaging/bindeps/#{target}"
-  sh "mkdir -p #{bindest}"
-  sh "rm -rf packaging/bindeps/#{target}/*"
-  real_os = RbConfig::CONFIG['host_os']
-  real_path = ENV['PATH']
-  RbConfig::CONFIG['host_os'] = target == 'osx' ? 'darwin' : target
-  ENV['PATH'] = "/usr/local/bin:/usr/local/sbin:/usr/bin:/bin:/usr/sbin:/sbin"
-  bindeps_file = File.join(File.dirname(__FILE__), 'deps/deps.yaml')
-  Bindeps.require(bindeps_file, bindest)
-  RbConfig::CONFIG['host_os'] = real_os
-  ENV['PATH'] = real_path
-  sh "cp -r packaging/bindeps/#{target}/{bin,lib} #{package_dir}/"
-  # install c extension
-  sh "cp test/vagrant/#{target}/libruby.* #{package_dir}/lib/"
-  sh "cp test/vagrant/#{target}/transrate.* #{package_dir}/lib/app/ext/transrate/"
+  sh "mkdir -p #{package_dir}/bin"
+  sh "mkdir -p #{package_dir}/lib"
+  sh "wget -nc https://github.com/HibberdLab/snap/releases/download/v100/snap-aligner.tar.gz"
+  sh "wget -nc https://github.com/Blahah/transrate-tools/releases/download/v1.0.0/bam-read_v1.0.0_linux.tar.gz"
+  sh "wget -nc https://github.com/COMBINE-lab/salmon/releases/download/v0.7.2/Salmon-0.7.2_linux_x86_64.tar.gz"
+  sh "find . -maxdepth 1 -name '*.tar.gz' -exec tar xzf '{}' \\;" # unpack
+  sh "cp snap-aligner #{package_dir}/bin/."
+  sh "cp bam-read #{package_dir}/bin/."
+  sh "cp Salmon-0.7.2_linux_x86_64/bin/salmon #{package_dir}/bin/."
+  sh "cp -r Salmon-0.7.2_linux_x86_64/lib/* #{package_dir}/lib/."
+
+  sh "cp packaging/libruby.* #{package_dir}/lib/."
+
+  sh "mkdir #{package_dir}/lib/.bundle"
+  sh "cp packaging/bundler-config #{package_dir}/lib/.bundle/config"
+
   # create package
   if !ENV['DIR_ONLY']
-    sh "cd packaging && tar -czf #{package_pref}.tar.gz #{package_pref}"
-    sh "rm -rf #{package_dir}"
+    sh "cd packaging && tar -czf #{package_name}.tar.gz #{package_name}"
+    # sh "rm -rf #{package_dir}"
   end
-  # cleanup
-  sh "rm -rf packaging/vendor packaging/bindeps .bundle"
+  # clean up
+  # sh "rm -rf packaging/vendor packaging/bindeps .bundle"
 end
 
-def download_runtime(target)
-  sh "mkdir -p packaging/packaging &&" +
-  "cd packaging/packaging && curl -L -O --fail " +
-  "http://d6r77u77i8pq3.cloudfront.net/releases/traveling-ruby-#{TRAVELING_RUBY_VERSION}-#{target}.tar.gz"
+def download_runtime
+  sh "mkdir -p packaging/packaging && " +
+     "cd packaging/packaging && " +
+     "curl -L -O --fail " + TRAVELING_RUBY_URL
 end
