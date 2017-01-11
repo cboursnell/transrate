@@ -13,7 +13,7 @@ module Transrate
     def initialize assembly
       @assembly = assembly # Transrate::Assembly
       @mapper = Snap.new
-      @salmon = Salmon.new
+      @salmon = Salmon.new assembly
       self.initial_values
 
       load_executables
@@ -53,6 +53,12 @@ module Transrate
       bamfile = @mapper.map_reads(@assembly.file, left, right,
                                   threads: threads)
       @fragments = @mapper.read_count
+      if @fragments < 10
+        raise TransrateError.new "too few fragments"
+      end
+      unless File.exist?(bamfile)
+        raise TransrateIOError.new "Can't find #{bamfile} bamfile"
+      end
 
       assigned_bam = "postSample.bam"
       final_bam = "#{File.basename(bamfile, '.bam')}.assigned.bam"
@@ -117,7 +123,7 @@ module Transrate
     end
 
     def assign_and_quantify(bamfile, threads)
-      @salmon.run(@assembly, bamfile, threads)
+      return @salmon.run(bamfile, threads)
     end
 
     def analyse_expression salmon_output
@@ -157,7 +163,7 @@ module Transrate
       else
         raise TransrateError.new "couldn't find bamfile: #{bamfile}"
       end
-      salmon_results = "#{File.basename @assembly.file}_quant.sf"
+      salmon_results = @salmon.fin_output
 
       if File.exist?(salmon_results)
         analyse_expression(@salmon.load_expression(salmon_results))
@@ -198,6 +204,10 @@ module Transrate
       name = Bio::FastaDefline.new(row[:name].to_s).entry_id
       name.gsub!(/;$/, '') # trim trailing semicolon
       contig = @assembly[name]
+      unless row.has_key?(:p_seq_true)
+        msg = "Something went wrong with reading bam file"
+        raise TransrateError.new msg
+      end
       contig.p_seq_true = row[:p_seq_true]
       contig.uncovered_bases = row[:bases_uncovered]
       @bases_uncovered += contig.uncovered_bases

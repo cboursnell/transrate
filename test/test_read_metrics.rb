@@ -40,8 +40,8 @@ class TestReadMetrics < MiniTest::Test
           assert_in_delta 3761,  stats[:bad_mappings], 50, 'bad mapping'
           # assert_in_delta 2,  stats[:potential_bridges], 1, 'bridges'
           assert_equal 93, stats[:contigs_uncovbase], 'uncovered base contig'
-          assert_equal 28, stats[:contigs_uncovered], 'uncovered contig'
-          assert_equal 71, stats[:contigs_lowcovered], 'lowcovered contig'
+          assert_equal 15, stats[:contigs_uncovered], 'uncovered contig'
+          assert_equal 15, stats[:contigs_lowcovered], 'lowcovered contig'
         end
       end
     end

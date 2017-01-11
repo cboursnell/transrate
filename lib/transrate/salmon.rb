@@ -5,34 +5,38 @@ module Transrate
 
   class Salmon
 
-    def initialize
+    attr_reader :fin_output
+
+    def initialize assembly
       which = Cmd.new('which salmon')
+      @fin_output = ""
+      @assembly = assembly
+      @assembly = assembly.file if assembly.is_a? Assembly
       which.run
       if !which.status.success?
         raise SalmonError.new("could not find salmon in the path")
       end
       @salmon = which.stdout.split("\n").first
+      @output = "quant.sf"
+      @sampled_bam = "postSample.bam"
+      @fin_output = "#{File.basename(@assembly)}_#{@output}"
     end
 
-    def run assembly, bamfile, threads=8
-      assembly = assembly.file if assembly.is_a? Assembly
-      output = "quant.sf"
-      sampled_bam = "postSample.bam"
-      @fin_output = "#{File.basename assembly}_#{output}"
+    def run bamfile, threads=8
       unless File.exist? @fin_output
-        salmon = Cmd.new build_command(assembly, bamfile, threads)
+        salmon = Cmd.new build_command(@assembly, bamfile, threads)
         salmon.run
         unless salmon.status.success?
           logger.error salmon.stderr
           raise SalmonError.new("Salmon failed")
         end
-        unless File.exist?(sampled_bam)
+        unless File.exist?(@sampled_bam)
           logger.error salmon.stderr
-          raise SalmonError.new("#{sampled_bam} not created")
+          raise SalmonError.new("#{@sampled_bam} not created")
         end
-        File.rename(output, @fin_output)
+        File.rename(@output, @fin_output)
       end
-      return sampled_bam
+      return @sampled_bam
     end
 
     def build_command assembly, bamfile, threads=4
@@ -45,10 +49,9 @@ module Transrate
       cmd << " --sampleUnaligned" # thanks Rob!
       cmd << " --output ."
       cmd << " --useErrorModel"
-      cmd << " --biasCorrect"
+      cmd << " --seqBias"
       cmd << " --noEffectiveLengthCorrection"
-      cmd << " --useFSPD"
-      cmd
+      return cmd
     end
 
     def load_expression file

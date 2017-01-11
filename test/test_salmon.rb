@@ -6,7 +6,7 @@ class TestSalmon < MiniTest::Test
   context "Salmon" do
 
     setup do
-      @salmon = Transrate::Salmon.new
+      @salmon = Transrate::Salmon.new "assembly.fa"
     end
 
     should "load an expression file" do
@@ -37,7 +37,7 @@ class TestSalmon < MiniTest::Test
       test = "quant --libType IU --alignments alignments.bam "
       test << "--targets assembly.fa --threads 4 --sampleOut "
       test << "--sampleUnaligned --output . --useErrorModel "
-      test << "--biasCorrect --noEffectiveLengthCorrection --useFSPD"
+      test << "--seqBias --noEffectiveLengthCorrection"
       assert_equal test, cmd, "cmd is wrong"
     end
 

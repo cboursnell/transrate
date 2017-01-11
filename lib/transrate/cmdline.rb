@@ -7,6 +7,7 @@ class Cmdline
   require 'bindeps'
   require 'colorize'
   require 'pathname'
+  require 'yaml'
 
   def initialize args
     @opts = parse_arguments args
@@ -229,10 +230,25 @@ OPTIONS:
   end
 
   def check_output
-    if File.exist?("#{@opts.output}/#{@outfile}")
-      msg = "assemblies.csv would be overwritten in #{@opts.output}/. "
-      msg << "please choose a different output directory"
-      raise TransrateArgError.new msg
+    output = "#{@opts.output}/#{@outfile}"
+    @loaded_results = {}
+    if File.exist?(output) and File.stat(output).size > 0
+      # load existing 'assemblies.csv' into hash
+      line_number=0
+      header = []
+      File.open(output).each do |line|
+        cols = line.chomp.split(",")
+        if line_number == 0
+          header = cols
+        else
+          hash={}
+          header.zip(cols).each do |a, b|
+            hash[a]=b
+          end
+          @loaded_results[hash["assembly"]] = hash
+        end
+        line_number+=1
+      end
     end
   end
 
@@ -467,19 +483,28 @@ OPTIONS:
   def write_assembly_csv results
     logger.info "Writing analysis results to #{@outfile}"
 
-    CSV.open(@outfile, 'wb') do |file|
+    results.each do |hash|
+      hash = hash.collect{|k,v| [k.to_s, v]}.to_h
+      @loaded_results[hash["assembly"]] = hash
+    end
 
-      keys = results[0].keys
-      keys.delete(:assembly)
-      head = [:assembly] + keys
-      file << head
-      results.each do |row|
-        file << head.map { |x|
-          entry = row[x]
-          entry.is_a?(Float) ? entry.round(5) : entry
-        }
+    # reorder hashes
+    keys = @loaded_results.first.last.keys
+    keys.delete("assembly")
+    head = ["assembly"] + keys
+    File.open(@outfile, "w") do |io|
+      #write header
+      io.write("#{head.join(",")}\n")
+      if @loaded_results.size > 0
+        # TODO sort and put assemblies first - done
+        @loaded_results.each do |name,hash|
+          l = []
+          head.each do |key|
+            l << hash[key]
+          end
+          io.write("#{l.join(",")}\n")
+        end
       end
-
     end
 
   end # write_assembly_csv
@@ -487,8 +512,19 @@ OPTIONS:
   def contig_metrics transrater
     logger.info "Calculating contig metrics..."
     t0 = Time.now
-    contig_results = transrater.assembly_metrics.basic_stats
-    contig_results.merge! transrater.assembly.contig_metrics.results
+    yaml = "contig_stats.yaml"
+    loaded = false
+    if File.exist?(yaml)
+      puts "found contig stats yaml file"
+      contig_results = YAML.load_file(yaml)
+      loaded = true
+    else
+      contig_results = transrater.assembly_metrics.basic_stats
+      contig_results.merge! transrater.assembly.contig_metrics.results
+      unless File.exist?(yaml)
+        File.open(yaml, 'w') { |f| f.write contig_results.to_yaml }
+      end
+    end
 
     if contig_results
       logger.info "Contig metrics:"
@@ -496,7 +532,11 @@ OPTIONS:
       pretty_print_hash(contig_results, @report_width)
     end
 
-    logger.info "Contig metrics done in #{(Time.now - t0).round} seconds"
+    if loaded
+      logger.info "Contig metrics loaded from file"
+    else
+      logger.info "Contig metrics done in #{(Time.now - t0).round} seconds"
+    end
     contig_results
   end
 

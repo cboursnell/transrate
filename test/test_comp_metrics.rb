@@ -361,21 +361,18 @@ class TestCompMetrics2 < MiniTest::Test
           assert_equal 0.5, comp.comp_stats[:p_refs_with_CRBB], "p_refs_with_CRBB"
           assert_equal 10, comp.comp_stats[:cov25], "cov25"
           assert_equal 10, comp.comp_stats[:cov50], "cov50"
-          assert_equal 7, comp.comp_stats[:cov75], "cov75"
-          assert_equal 6, comp.comp_stats[:cov85], "cov85"
-          assert_equal 3, comp.comp_stats[:cov95], "cov95"
+          assert_equal 9, comp.comp_stats[:cov75], "cov75"
+          assert_equal 8, comp.comp_stats[:cov85], "cov85"
+          assert_equal 7, comp.comp_stats[:cov95], "cov95"
           assert_equal 0.5, comp.comp_stats[:p_cov25], "p_cov25"
           assert_equal 0.5, comp.comp_stats[:p_cov50], "p_cov50"
-          assert_equal 0.35, comp.comp_stats[:p_cov75], "p_cov75"
-          assert_equal 0.3, comp.comp_stats[:p_cov85], "p_cov85"
-          assert_equal 0.15, comp.comp_stats[:p_cov95], "p_cov95"
-          assert_equal 0.37261, comp.comp_stats[:reference_coverage].round(5), "reference_coverage"
-
+          assert_equal 0.45, comp.comp_stats[:p_cov75], "p_cov75"
+          assert_equal 0.4, comp.comp_stats[:p_cov85], "p_cov85"
+          assert_equal 0.35, comp.comp_stats[:p_cov95], "p_cov95"
+          assert_equal 0.40542, comp.comp_stats[:reference_coverage].round(5), "reference_coverage"
         end
       end
     end
-
-
 
   end
 end
